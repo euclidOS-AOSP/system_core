@@ -1215,6 +1215,35 @@ static void SetSafetyNetProps() {
     }
 }
 
+void LoadDebugProperties() {
+    const char* DEBUG_PROP = "persist.sys.ax_debug_enabled";
+    std::string error;
+    uint32_t res;
+
+    std::string debug_value = GetProperty(DEBUG_PROP, "1");
+
+    if (debug_value == "1") {
+        const std::pair<const char*, const char*> debug_props[] = {
+            {"service.adb.root", "1"},
+            {"ro.adb.secure", "0"},
+            {"ro.debuggable", "1"},
+            {"ro.force.debuggable", "1"},
+            {"persist.sys.usb.config", "adb"},
+            {"sys.usb.config", "adb"}
+        };
+
+        for (const auto& [name, value] : debug_props) {
+            res = PropertySetNoSocket(name, value, &error);
+            if (res == PROP_SUCCESS) {
+                LOG(INFO) << "Debug property '" << name << "' set to '" << value << "'";
+            } else {
+                LOG(ERROR) << "Failed to set debug property '" << name
+                           << "' to '" << value << "': err=" << res << " (" << error << ")";
+            }
+        }
+    }
+}
+
 void PropertyLoadBootDefaults() {
     // We read the properties and their values into a map, in order to always allow properties
     // loaded in the later property files to override the properties in loaded in the earlier
@@ -1330,6 +1359,8 @@ void PropertyLoadBootDefaults() {
         SetSafetyNetProps();
       }
     }
+    
+    LoadDebugProperties();
 
     // Restore the normal property override security after init extension is executed
     weaken_prop_override_security = false;
