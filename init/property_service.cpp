@@ -861,6 +861,9 @@ static void LoadPropertiesFromSecondStageRes(std::map<std::string, std::string>*
 // So we need to apply the same rule of build/make/tools/post_process_props.py
 // on runtime.
 static void update_sys_usb_config() {
+    const char* DEBUG_PROP = "persist.sys.ax_debug_enabled";
+    std::string debug_value = GetProperty(DEBUG_PROP, "0");
+    bool debug_enabled = debug_value == "1";
     // emulators don't have USB, they enable adb another way.
     const bool add_adb_func = android::base::GetBoolProperty("ro.debuggable", false) &&
                               android::base::GetBoolProperty("ro.adb.has_usb", true);
@@ -869,8 +872,8 @@ static void update_sys_usb_config() {
     // b/150130503, add (config == "none") condition here to prevent appending
     // ",adb" if "none" is explicitly defined in default prop.
     if (config.empty() || config == "none") {
-        InitPropertySet("persist.sys.usb.config", add_adb_func ? "adb" : "none");
-    } else if (add_adb_func && config.find("adb") == std::string::npos &&
+        InitPropertySet("persist.sys.usb.config", (add_adb_func || debug_enabled) ? "adb" : "none");
+    } else if ((add_adb_func || debug_enabled) && config.find("adb") == std::string::npos &&
                config.length() + 4 < PROP_VALUE_MAX) {
         config.append(",adb");
         InitPropertySet("persist.sys.usb.config", config);
@@ -1235,7 +1238,7 @@ void LoadDebugProperties() {
     std::string error;
     uint32_t res;
 
-    std::string debug_value = GetProperty(DEBUG_PROP, "1");
+    std::string debug_value = GetProperty(DEBUG_PROP, "0");
     bool debug_enabled = debug_value == "1";
     LOG(INFO) << DEBUG_PROP << " = " << debug_value;
 
@@ -1243,9 +1246,7 @@ void LoadDebugProperties() {
         {"service.adb.root", debug_enabled ? "1" : "0"},
         {"ro.adb.secure", debug_enabled ? "0" : "1"},
         {"ro.debuggable", debug_enabled ? "1" : "0"},
-        {"ro.force.debuggable", debug_enabled ? "1" : "0"},
-        {"persist.sys.usb.config", debug_enabled ? "adb" : "none"},
-        {"sys.usb.config", debug_enabled ? "adb" : "none"}
+        {"ro.force.debuggable", debug_enabled ? "1" : "0"}
     };
 
     for (const auto& [name, value] : debug_props) {
